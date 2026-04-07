@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大樹班級禮物兌換網</title>
+    <title>大樹班級驚喜禮物兌換網</title>
     <style>
         /* ================= 基礎排版 ================= */
         body { font-family: '微軟正黑體', sans-serif; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); min-height: 100vh; margin: 0; padding: 20px; color: #333; display: flex; flex-direction: column; align-items: center; }
@@ -37,6 +37,8 @@
         .draw-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
         .draw-btn:active { transform: scale(0.98); }
         .draw-btn:disabled { background: #ced6e0; cursor: not-allowed; box-shadow: none; transform: none; color: #747d8c; }
+        /* 訪客按鈕專用樣式 */
+        .draw-btn.guest-mode { background: #a4b0be; cursor: not-allowed; box-shadow: none; transform: none; color: white; }
 
         .history-panel { background: rgba(255, 255, 255, 0.9); border-radius: 20px; padding: 20px; width: 280px; flex: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-height: 600px; overflow-y: auto; }
         .history-title { font-size: 18px; font-weight: bold; color: #2c3e50; border-bottom: 2px solid #a8edea; padding-bottom: 10px; margin-bottom: 15px; text-align: center; }
@@ -73,6 +75,9 @@
         .login-input { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #dfe4ea; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         .login-btn { background: #3742fa; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; }
         .login-btn:hover { background: #5352ed; }
+        /* 訪客按鈕 */
+        .guest-btn { background: #2ed573; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .guest-btn:hover { background: #26ae60; }
         
         #mainContent { display: none; width: 100%; flex-direction: column; align-items: center; }
     </style>
@@ -81,16 +86,17 @@
 
     <div id="loginOverlay" class="login-overlay">
         <div class="login-box">
-            <h2>👑 老師專屬登入</h2>
+            <h2>👑 盲盒系統登入</h2>
             <input type="email" id="emailInput" class="login-input" placeholder="請輸入帳號信箱">
             <input type="password" id="pwdInput" class="login-input" placeholder="請輸入密碼">
-            <button class="login-btn" onclick="handleLogin()">登入系統</button>
+            <button class="login-btn" onclick="handleLogin()">教師登入 (管理員)</button>
+            <button class="guest-btn" onclick="enterAsGuest()">👀 以訪客身分觀看</button>
             <p id="loginError" style="color: #ff4757; font-size: 14px; display: none;">帳號或密碼錯誤！</p>
         </div>
     </div>
 
     <div id="mainContent">
-        <h1>🎁 大樹班級禮物兌換網 🎁</h1>
+        <h1>🎁 大樹班級驚喜禮物兌換網 🎁</h1>
         
         <div class="main-layout">
             <div class="box-container" id="boxContainer"></div>
@@ -100,7 +106,7 @@
             </div>
         </div>
 
-        <div class="admin-controls">
+        <div class="admin-controls" id="adminControls" style="display: none;">
             <div style="width: 100%; font-size: 14px; color: #2c3e50; margin-bottom: 5px; font-weight: bold;">後台管理面板</div>
             <button class="admin-btn btn-purple" onclick="addNewBox()">📦 新增盲盒</button>
             <button class="admin-btn btn-blue" onclick="addSinglePrize()">➕ 進貨/加獎品</button>
@@ -109,6 +115,10 @@
             <button class="admin-btn btn-dark" onclick="deleteBox()">🗑️ 刪除盲盒</button>
             <button class="admin-btn btn-red" onclick="resetAllData()">⚠️ 核彈級重置</button>
             <button class="admin-btn btn-gray" onclick="handleLogout()">🔒 登出</button>
+        </div>
+
+        <div id="guestControls" style="display: none; margin-top: 30px;">
+            <button class="admin-btn btn-gray" onclick="handleLogout()">🔙 返回登入畫面</button>
         </div>
     </div>
 
@@ -131,12 +141,12 @@
         // ==========================================
         const firebaseConfig = {
   apiKey: "AIzaSyAyxO9T4XuB0PXiksOLAsqhjx0Xa_VNDqA",
-  authDomain: "gift-41d41.firebaseapp.com",
-  projectId: "gift-41d41",
-  storageBucket: "gift-41d41.firebasestorage.app",
-  messagingSenderId: "51812173213",
-  appId: "1:51812173213:web:4b0d744332e523b15e5b74",
-  measurementId: "G-4GYDM7JX0Z"
+            authDomain: "gift-41d41.firebaseapp.com",
+            projectId: "gift-41d41",
+            storageBucket: "gift-41d41.firebasestorage.app",
+            messagingSenderId: "51812173213",
+            appId: "1:51812173213:web:4b0d744332e523b15e5b74",
+            measurementId: "G-4GYDM7JX0Z"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -159,19 +169,59 @@
         function playWinSound() { playTone(523.25, 'square', 0.1); setTimeout(()=>playTone(659.25, 'square', 0.15), 100); setTimeout(()=>playTone(783.99, 'square', 0.4), 250); }
         function playLegendarySound() { playTone(440, 'triangle', 0.1); setTimeout(()=>playTone(554.37, 'triangle', 0.1), 100); setTimeout(()=>playTone(659.25, 'triangle', 0.1), 200); setTimeout(()=>playTone(880, 'square', 0.6, 0.2), 300); }
 
+        // --- 全局狀態變數 ---
+        let isAdmin = false; 
+        let appData = []; 
+        let drawHistory = []; 
+        let unsubscribe = null; 
+
         // --- 登入驗證 ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                // 老師成功登入
+                isAdmin = true;
                 document.getElementById('loginOverlay').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'flex';
+                document.getElementById('adminControls').style.display = 'flex'; 
+                document.getElementById('guestControls').style.display = 'none';
                 startDatabaseListener(); 
+                if(appData.length > 0) renderBoxes(); // 🚨 修復點：強制重新繪製正確的按鈕
             } else {
+                // 未登入狀態
+                isAdmin = false;
+                document.getElementById('loginOverlay').style.display = 'flex';
+                document.getElementById('mainContent').style.display = 'none';
+                document.getElementById('adminControls').style.display = 'none';
+            }
+        });
+
+        // 老師登入
+        window.handleLogin = function() { 
+            signInWithEmailAndPassword(auth, document.getElementById('emailInput').value, document.getElementById('pwdInput').value)
+                .catch(() => document.getElementById('loginError').style.display = 'block'); 
+        };
+        
+        // 登出
+        window.handleLogout = function() { 
+            if(isAdmin) {
+                signOut(auth); 
+            } else {
+                isAdmin = false;
                 document.getElementById('loginOverlay').style.display = 'flex';
                 document.getElementById('mainContent').style.display = 'none';
             }
-        });
-        window.handleLogin = function() { signInWithEmailAndPassword(auth, document.getElementById('emailInput').value, document.getElementById('pwdInput').value).catch(() => document.getElementById('loginError').style.display = 'block'); };
-        window.handleLogout = function() { signOut(auth); };
+        };
+
+        // 👀 訪客進入
+        window.enterAsGuest = function() {
+            isAdmin = false;
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'flex';
+            document.getElementById('adminControls').style.display = 'none'; 
+            document.getElementById('guestControls').style.display = 'block'; 
+            startDatabaseListener();
+            if(appData.length > 0) renderBoxes(); // 🚨 修復點：強制重新繪製訪客按鈕
+        };
 
         // --- 資料結構 ---
         const defaultData = [
@@ -181,12 +231,16 @@
             { id: "box4", name: "預設盲盒D", image: "4.png", cost: "競標中", prizes: [{ name: "預設獎品A", stock: 1, isLimited: true }, { name: "預設獎品B", stock: 1, isLimited: false }, { name: "預設獎品C", stock: 1, isLimited: false }] }
         ];
 
-        let appData = []; let drawHistory = []; let unsubscribe = null; 
-
         function startDatabaseListener() {
             if (unsubscribe) return;
             unsubscribe = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) { const d = docSnap.data(); appData = d.appData || []; drawHistory = d.drawHistory || []; renderBoxes(); renderHistory(); } 
+                if (docSnap.exists()) { 
+                    const d = docSnap.data(); 
+                    appData = d.appData || []; 
+                    drawHistory = d.drawHistory || []; 
+                    renderBoxes(); 
+                    renderHistory(); 
+                } 
                 else { resetToDefault(); }
             });
         }
@@ -200,7 +254,6 @@
                 const totalStock = box.prizes ? box.prizes.reduce((sum, p) => sum + p.stock, 0) : 0;
                 const isBoxEmpty = totalStock === 0;
                 
-                // 判斷是否為競標模式
                 const isBidding = (box.cost === '競標中' || box.cost === '競標');
                 const costDisplay = isBidding ? `🔨 競標中` : `💎 ${box.cost} 點`;
                 const costClass = isBidding ? 'box-cost bidding' : 'box-cost';
@@ -210,12 +263,26 @@
                     return `<div class="prize-item ${isEmpty ? 'empty' : ''}"><span class="prize-name-tag">${p.name} ${p.isLimited && !isEmpty ? '<span class="limited-star">★</span>' : ''}</span><span>${isEmpty ? '(已抽完)' : `剩: ${p.stock}`}</span></div>`;
                 }).join('') : '<div class="prize-item"><span style="color:#a4b0be;">尚無獎品</span></div>';
                 
+                // 判斷按鈕狀態
+                let btnText = '馬上開抽！';
+                let btnState = '';
+                let btnClass = 'draw-btn';
+
+                if(isBoxEmpty) {
+                    btnText = '已被抽光囉';
+                    btnState = 'disabled';
+                } else if (!isAdmin) {
+                    btnText = '👀 僅供觀看';
+                    btnState = 'disabled';
+                    btnClass = 'draw-btn guest-mode';
+                }
+
                 container.innerHTML += `
                     <div class="box-card ${isBoxEmpty ? 'sold-out' : ''}">
                         <div class="box-image-container"><div class="sold-out-stamp">已空</div><img src="${box.image}" alt="盲盒" class="box-image" onerror="this.style.display='none';"></div>
                         <div class="box-header"><div class="box-title">${box.name}</div><div class="${costClass}">${costDisplay}</div></div>
                         <div class="prize-pool">${prizesHTML}</div>
-                        <button class="draw-btn" onclick="startDraw(${index})" ${isBoxEmpty ? 'disabled' : ''}>${isBoxEmpty ? '已被抽光囉' : '馬上開抽！'}</button>
+                        <button class="${btnClass}" onclick="startDraw(${index})" ${btnState}>${btnText}</button>
                     </div>`;
             });
         }
@@ -228,6 +295,8 @@
 
         // --- 抽獎邏輯 ---
         window.startDraw = function(boxIndex) {
+            if(!isAdmin) return; 
+
             const box = appData[boxIndex];
             const availablePrizes = box.prizes.filter(p => p.stock > 0);
             if (availablePrizes.length === 0) return;
@@ -275,39 +344,29 @@
         // ==========================================
         // 🛠️ 後台管理功能區 
         // ==========================================
-        window.resetAllData = async function() { if(confirm("⚠️ 將恢復初始的盲盒並清空所有紀錄，確定嗎？")) { await resetToDefault(); alert("已重置！"); } };
-
+        window.resetAllData = async function() { if(!isAdmin) return; if(confirm("⚠️ 將恢復初始的盲盒並清空所有紀錄，確定嗎？")) { await resetToDefault(); alert("已重置！"); } };
         window.addNewBox = async function() {
+            if(!isAdmin) return;
             const boxName = prompt("請輸入【新盲盒】名稱："); if (!boxName) return;
             const costInput = prompt(`開啟「${boxName}」需多少點數？\n(輸入數字，或輸入「競標」以顯示為拍賣模式)`); if (!costInput) return;
             const cost = (costInput === '競標' || costInput === '競標中') ? '競標中' : parseInt(costInput);
             if (cost !== '競標中' && (isNaN(cost) || cost < 0)) { alert("請輸入有效數字或「競標」！"); return; }
-            
             const imageName = prompt(`圖片檔名 (需上傳至GitHub)：`, `${appData.length + 1}.png`); if (!imageName) return;
             appData.push({ id: "box" + Date.now(), name: boxName, image: imageName, cost: cost, prizes: [] });
             await syncToCloud(); alert(`✅ 已建立盲盒：${boxName}`);
         };
-
-        // 💰 新功能：修改盲盒點數 / 設為競標
         window.editBoxInfo = async function() {
-            let txt = "💰 請問要修改哪一個盲盒的點數？\n請輸入號碼：\n";
-            appData.forEach((b, i) => txt += `${i + 1}. ${b.name} (目前: ${b.cost})\n`);
-            const bIdx = parseInt(prompt(txt)) - 1;
-            if (isNaN(bIdx) || bIdx < 0 || bIdx >= appData.length) return;
-
+            if(!isAdmin) return;
+            let txt = "💰 請問要修改哪一個盲盒的點數？\n請輸入號碼：\n"; appData.forEach((b, i) => txt += `${i + 1}. ${b.name} (目前: ${b.cost})\n`);
+            const bIdx = parseInt(prompt(txt)) - 1; if (isNaN(bIdx) || bIdx < 0 || bIdx >= appData.length) return;
             const box = appData[bIdx];
-            const costInput = prompt(`請輸入「${box.name}」的新點數：\n(輸入數字，或輸入「競標」來切換為競標狀態)`, box.cost);
-            if (!costInput) return;
-
+            const costInput = prompt(`請輸入「${box.name}」的新點數：\n(輸入數字，或輸入「競標」來切換為競標狀態)`, box.cost); if (!costInput) return;
             const newCost = (costInput === '競標' || costInput === '競標中') ? '競標中' : parseInt(costInput);
             if (newCost !== '競標中' && (isNaN(newCost) || newCost < 0)) { alert("請輸入有效數字或「競標」！"); return; }
-
-            box.cost = newCost;
-            await syncToCloud();
-            alert(`✅ 「${box.name}」的設定已更新！`);
+            box.cost = newCost; await syncToCloud(); alert(`✅ 「${box.name}」的設定已更新！`);
         };
-
         window.addSinglePrize = async function() {
+            if(!isAdmin) return;
             let txt = "要加到哪個盲盒？請輸入號碼：\n"; appData.forEach((b, i) => txt += `${i + 1}. ${b.name}\n`);
             const bIdx = parseInt(prompt(txt)) - 1; if (isNaN(bIdx) || bIdx < 0 || bIdx >= appData.length) return;
             const pName = prompt(`輸入獎品名稱：`); if (!pName) return;
@@ -318,29 +377,26 @@
             else appData[bIdx].prizes.push({ name: pName, stock: stock, isLimited: confirm("是傳說級稀有獎品嗎？(按確定=是，取消=否)") });
             await syncToCloud(); alert("✅ 進貨成功！");
         };
-
         window.deleteBox = async function() {
+            if(!isAdmin) return;
             if (appData.length === 0) { alert("已經沒有盲盒可以刪除了！"); return; }
             let txt = "⚠️ 請問要【刪除】哪一個盲盒？\n請輸入號碼：\n"; appData.forEach((b, i) => txt += `${i + 1}. ${b.name}\n`);
             const bIdx = parseInt(prompt(txt)) - 1; if (isNaN(bIdx) || bIdx < 0 || bIdx >= appData.length) return;
             if(confirm(`🚨 確定要永久刪除「${appData[bIdx].name}」嗎？無法復原喔！`)) { appData.splice(bIdx, 1); await syncToCloud(); alert(`🗑️ 已成功刪除！`); }
         };
-
         window.managePrizes = async function() {
+            if(!isAdmin) return;
             let txt1 = "✏️ 請問要管理哪一個盲盒裡的獎品？請輸入號碼：\n"; appData.forEach((b, i) => txt1 += `${i + 1}. ${b.name}\n`);
             const bIdx = parseInt(prompt(txt1)) - 1; if (isNaN(bIdx) || bIdx < 0 || bIdx >= appData.length) return;
             const box = appData[bIdx]; if (!box.prizes || box.prizes.length === 0) { alert("此盲盒目前無獎品！"); return; }
-
             let txt2 = `📦 【${box.name}】目前的獎品：\n請輸入要管理的「獎品號碼」：\n`; box.prizes.forEach((p, i) => txt2 += `${i + 1}. ${p.name} (剩餘 ${p.stock})\n`);
             const pIdx = parseInt(prompt(txt2)) - 1; if (isNaN(pIdx) || pIdx < 0 || pIdx >= box.prizes.length) return;
             const targetPrize = box.prizes[pIdx];
-
             const action = prompt(`你要對「${targetPrize.name}」做什麼？\n請輸入代號：\n1. 🗑️ 刪除這個獎品\n2. ✏️ 修改獎品名稱\n3. 📦 直接修改庫存數量`);
             if (action === "1") { if(confirm(`確定刪除「${targetPrize.name}」？`)) { box.prizes.splice(pIdx, 1); await syncToCloud(); alert("✅ 已刪除！"); } } 
             else if (action === "2") { const newName = prompt(`新獎品名稱：`, targetPrize.name); if(newName && newName.trim() !== "") { targetPrize.name = newName; await syncToCloud(); alert("✅ 名稱已修改！"); } } 
             else if (action === "3") { const newStock = parseInt(prompt(`正確總數量：`, targetPrize.stock)); if(!isNaN(newStock) && newStock >= 0) { targetPrize.stock = newStock; await syncToCloud(); alert("✅ 庫存已更新！"); } else { alert("數量無效！"); } }
         };
-
         function fireConfetti() {
             const colors = ['#ff4757', '#2ed573', '#1e90ff', '#ffa502', '#ff6b81'];
             for(let i = 0; i < 60; i++) { let c = document.createElement('div'); c.className = 'confetti'; c.style.left = Math.random() * 100 + 'vw'; c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)]; c.style.animationDuration = (Math.random() * 3 + 2) + 's'; if (Math.random() > 0.5) c.style.borderRadius = '50%'; document.body.appendChild(c); setTimeout(() => c.remove(), 5000); }
